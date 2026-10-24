@@ -190,12 +190,31 @@ enum InputSourceSwitcher {
         )
     }
 
+    // A read-only policy gate for system selection, separated for deterministic
+    // XCTest coverage without changing the host's input source.
+    static func shouldPerformPhysicalSelection(
+        isCJKVTarget: Bool,
+        matchesActual: () -> Bool
+    ) -> Bool {
+        isCJKVTarget || !matchesActual()
+    }
+
     private static func switchToTarget(
         _ target: SwitchTarget,
         tisTarget: TISInputSource,
         cJKVFixStrategy: CJKVFixStrategy?
     ) {
         IndicatorDiagnostics.record("switch.target source=\(target.sourceID) mode=\(target.inputModeID ?? "nil") strategy=\(String(describing: cJKVFixStrategy))")
+        // A same-source request need not re-notify macOS for ordinary input
+        // sources. Keep CJKV re-selection intact: a logically selected input
+        // source can still have stale per-app input-mode state.
+        guard shouldPerformPhysicalSelection(
+            isCJKVTarget: target.isCJKV,
+            matchesActual: { target.matches(InputSource.getCurrentInputSource()) }
+        ) else {
+            IndicatorDiagnostics.record("switch.skip-already-current source=\(target.sourceID) mode=\(target.inputModeID ?? "nil")")
+            return
+        }
         guard target.isCJKV,
               let cJKVFixStrategy
         else {

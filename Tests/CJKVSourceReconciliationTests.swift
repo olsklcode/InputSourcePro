@@ -98,6 +98,33 @@ final class CJKVSourceReconciliationTests: XCTestCase {
         XCTAssertEqual(selection.sourceForReconciliation("EN"), "EN")
     }
 
+    func testAlreadySelectedOrdinarySourceAvoidsPhysicalTISCall() {
+        XCTAssertFalse(InputSourceSwitcher.shouldPerformPhysicalSelection(
+            isCJKVTarget: false,
+            matchesActual: { true }
+        ))
+    }
+
+    func testChangedOrdinarySourceStillInvokesPhysicalTISCall() {
+        XCTAssertTrue(InputSourceSwitcher.shouldPerformPhysicalSelection(
+            isCJKVTarget: false,
+            matchesActual: { false }
+        ))
+    }
+
+    func testCJKVSourcePreservesReselectionWithoutReadingCurrentTIS() {
+        var actualReads = 0
+        let shouldSelect = InputSourceSwitcher.shouldPerformPhysicalSelection(
+            isCJKVTarget: true,
+            matchesActual: {
+                actualReads += 1
+                return true
+            }
+        )
+        XCTAssertTrue(shouldSelect)
+        XCTAssertEqual(actualReads, 0)
+    }
+
     @MainActor
     private final class Harness {
         typealias Action = SourceReconciliationCore.Action<String, String>
